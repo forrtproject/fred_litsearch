@@ -1,0 +1,88 @@
+name: Long-Running Test
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: long-running-test
+  cancel-in-progress: false  # Prevents automatic cancellation
+
+jobs:
+  initialize:
+    runs-on: ubuntu-latest
+    outputs:
+      start_time: ${{ steps.set-time.outputs.start_time }}
+    steps:
+      - name: Set Start Timestamp
+        id: set-time
+        run: echo "start_time=$(date +%s)" >> $GITHUB_ENV && echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
+  wait-1:
+    needs: initialize
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for 5 hours 50 minutes (with periodic logging)
+        run: |
+          for i in {1..350}; do echo "Waiting... $i minutes"; sleep 60; done
+
+  wait-2:
+    needs: wait-1
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for 5 hours 50 minutes (with periodic logging)
+        run: |
+          for i in {1..350}; do echo "Waiting... $i minutes"; sleep 60; done
+
+  wait-3:
+    needs: wait-2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for 5 hours 50 minutes (with periodic logging)
+        run: |
+          for i in {1..350}; do echo "Waiting... $i minutes"; sleep 60; done
+
+  wait-4:
+    needs: wait-3
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for 5 hours 50 minutes (with periodic logging)
+        run: |
+          for i in {1..350}; do echo "Waiting... $i minutes"; sleep 60; done
+
+  final-wait:
+    needs: wait-4
+    runs-on: ubuntu-latest
+    env:
+      START_TIME: ${{ needs.initialize.outputs.start_time }}
+    steps:
+      - name: Compute Remaining Time
+        id: compute-time
+        run: |
+          CURRENT_TIME=$(date +%s)
+          START_TIME=${{ env.START_TIME }}
+          ELAPSED=$((CURRENT_TIME - START_TIME))
+          REMAINING=$((86400 - ELAPSED))
+
+          if [ $REMAINING -gt 0 ]; then
+            echo "Waiting for the final $REMAINING seconds..."
+            for i in $(seq 1 $((REMAINING / 60))); do echo "Final wait... $i minutes"; sleep 60; done
+            sleep $((REMAINING % 60))  # Wait for any remaining seconds
+          else
+            echo "Already at 24 hours."
+          fi
+
+  finalize:
+    needs: final-wait
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Record Completion Time
+        run: |
+          echo "Process completed at $(date)" > completion.txt
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add completion.txt
+          git commit -m "Process completed"
+          git push
